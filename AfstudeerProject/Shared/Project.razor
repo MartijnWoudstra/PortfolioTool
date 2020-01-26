@@ -1,0 +1,94 @@
+﻿@inject IJSRuntime JSRuntime;
+@if (ProjectModel != null)
+{
+    <li class="draggable" draggable="true" title="@ProjectModel.Description" @ondragstart="@(() => HandleDragStart(ProjectModel))">
+        <p class="description">Drag me</p>
+    </li>
+}
+
+@if (DependencyModel != null)
+{
+    <li class="draggable" draggable="false" title="@DependencyModel.DependencyType.ToString()"  @onclick="@(() =>OpenWindow(DependencyModel))"
+        @ondragstart="@(() => HandleDragStart(DependencyModel))">
+        <p class="description">@DependencyModel.DependencyType.ToString() (Click)</p>
+    </li>
+}
+
+@code {
+    [CascadingParameter] ProjectsContainer Container { get; set; }
+    [Parameter] public ProjectModel ProjectModel { get; set; }
+    [Parameter] public DependencyModel DependencyModel { get; set; }
+
+    private void HandleDragStart(ProjectModel selectedJob)
+    {
+        Container.Payload = selectedJob;
+    }
+
+    private void HandleDragStart(DependencyModel selectedJob)
+    {
+        Container.PayloadDep = selectedJob;
+    }
+
+    async void OpenWindow(DependencyModel model)
+    {
+
+        try
+        {
+            //todo
+            var source = await JSRuntime.InvokeAsync<string>(
+                   "openWindow.showPrompt1",
+                   "Select source number");
+            var target = await JSRuntime.InvokeAsync<string>(
+                   "openWindow.showPrompt2",
+                   "Select destination nummer");
+            if (model.DependencyType != DependencyType.Hard)
+            {
+
+            }
+
+            var Proj1Id = Int32.Parse(source);
+
+            var Proj2Id = Int32.Parse(target);
+            var DepType = model.DependencyType;
+            float Weight = 0;
+            if (DepType != DependencyType.Hard)
+            {
+                Weight = float.Parse(
+                    await JSRuntime.InvokeAsync<string>(
+                       "openWindow.showPrompt3",
+                       "Enter a weight")
+                    );
+            }
+
+            var Proj1 = Container.ProjectsPlaced.Where(_ => _.Id == Proj1Id).Single();
+            var Proj2 = Container.ProjectsPlaced.Where(_ => _.Id == Proj2Id).Single();
+
+            Container.DependenciesPlaced.Add(new ProjectDependencyModel()
+            {
+                Source = Proj1,
+                Destination = Proj2,
+                DependencyModel = new DependencyModel()
+                {
+                    DependencyType = DepType,
+                    Weight = Weight
+                },
+                Id = Container.DependenciesPlaced.Count() == 0 ? 1 : Container.DependenciesPlaced.OrderBy(_ => _.Id).Last().Id + 1
+            });
+            Container.HasChanged();
+
+            var isHard = DepType == DependencyType.Hard;
+            var isPos = !isHard && DepType == DependencyType.SoftPos ? true : false;
+
+            await JSRuntime.InvokeAsync<string>(
+                   "openWindow.adjustLine",
+                   "Project" + Proj1.Id,
+                   "Project" + Proj2.Id,
+                   isHard,
+                   isPos
+                   );
+        }
+        catch (Exception e) { 
+            //DONT
+        }
+    }
+}

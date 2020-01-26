@@ -1,0 +1,66 @@
+﻿@inject IJSRuntime JSRuntime;
+@using System.Linq;
+
+<div class="job-status">
+
+    <ul class="dropzone @dropClass" ondragover="event.preventDefault();"
+        @ondrop="HandleDrop"
+        @ondragenter="HandleDragEnter"
+        @ondragleave="HandleDragLeave">
+        <h4>Project</h4>
+        @foreach (var project in Projects)
+        {
+            <Project ProjectModel="project" />
+        }
+        <h4>Dependencies</h4>
+        @foreach (var dependency in Dependencies)
+        {
+            <Project DependencyModel="dependency"/>
+        }
+
+    </ul>
+</div>
+
+@code {
+
+    [CascadingParameter] ProjectsContainer Container { get; set; }
+
+    List<ProjectModel> Projects = new List<ProjectModel>();
+    List<DependencyModel> Dependencies = new List<DependencyModel>();
+    string dropClass = "";
+
+    protected override void OnParametersSet()
+    {
+        Projects.Clear();
+        Projects.AddRange(Container.Projects);
+        Dependencies.Clear();
+        Dependencies.AddRange(Container.Dependencies);
+    }
+
+    private void HandleDragEnter()
+    {
+
+        dropClass = "can-drop";
+    }
+
+    private void HandleDragLeave()
+    {
+        dropClass = "";
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        return;
+    }
+
+    private async Task HandleDrop()
+    {
+        dropClass = "";
+
+        //if (AllowedStatuses != null && !AllowedStatuses.Contains(Container.Payload.Status)) return;
+
+        //await Container.UpdateJobAsync(ListStatus);
+    }
+
+
+}

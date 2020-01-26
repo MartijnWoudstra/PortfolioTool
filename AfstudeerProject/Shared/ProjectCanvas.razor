@@ -1,0 +1,54 @@
+﻿@inject IJSRuntime JSRuntime;
+
+<li class="draggable" draggable="true" title="@ProjectModel.Description" @ondragstart="@(() => HandleDragStart(ProjectModel))" @onclick="() => OpenProperties(ProjectModel)">
+    <p>@(ProjectModel.Description != null ? ProjectModel.Description : ProjectModel.Id.ToString())</p>
+    @if (ProjectModel.Cost != null)
+    {
+        <p>Cost: @ProjectModel.Cost</p>
+    }
+    @if (ProjectModel.Reveneu != null)
+    {
+        <p>Profit: @ProjectModel.Reveneu</p>
+    }
+
+</li>
+
+@code {
+    [CascadingParameter] ProjectsContainer Container { get; set; }
+    [Parameter] public ProjectModel ProjectModel { get; set; }
+
+    private void HandleDragStart(ProjectModel selectedJob)
+    {
+        Container.Payload = selectedJob;
+    }
+
+    async void OpenProperties(ProjectModel model)
+    {
+        try
+        {
+            var descr = await JSRuntime.InvokeAsync<string>(
+           "openWindow.showPrompt6",
+           "Description: " + model.Description);
+            var newCost = await JSRuntime.InvokeAsync<string>(
+               "openWindow.showPrompt4",
+               "Old cost: " + model.Cost);
+            var newRev = await JSRuntime.InvokeAsync<string>(
+                   "openWindow.showPrompt5",
+                   "Old profit: " + model.Reveneu);
+            var dur = await JSRuntime.InvokeAsync<string>(
+                   "openWindow.showPrompt5",
+                   "Old duration: " + model.Duration);
+
+            var modal = Container.ProjectsPlaced.Single(_ => _.Id == model.Id);
+            modal.Reveneu = Double.Parse(newRev);
+            modal.Cost = Double.Parse(newCost);
+            modal.Description = descr;
+            modal.Duration = Int32.Parse(dur);
+
+        }
+        catch (Exception e) {
+
+        }
+        Container.HasChanged();
+    }
+}

@@ -1,0 +1,280 @@
+﻿@using ChartJs.Blazor.Charts
+@using ChartJs.Blazor.ChartJS.LineChart
+@using ChartJs.Blazor.ChartJS
+@using System.Linq
+@using ChartJs.Blazor.Util
+@using ChartJs.Blazor.ChartJS.Common
+@using System.Collections.Generic
+@using ChartJs.Blazor.ChartJS.Common.Properties
+@using ChartJs.Blazor.ChartJS.Common.Enums
+@using ChartJs.Blazor.ChartJS.Common.Axes
+@using ChartJs.Blazor.ChartJS.Common.Axes.Ticks
+@using ChartJs.Blazor.ChartJS.Common.Handlers
+@inject IJSRuntime runtime
+
+<div class="job-status-canvas">
+    <div id="Line"></div>
+    <div class="row">
+        <div class="col-3">
+            <h1>First order</h1>
+        </div>
+        <div class="col-3">
+            <h1>Second order</h1>
+        </div>
+        <div class="col-3">
+            <h1>Third order</h1>
+        </div>
+        <div class="col-3">
+            <h1>Fourth order</h1>
+        </div>
+    </div>
+    <div id="content">
+        <div class="row">
+            <div class="col-3">
+                <ul class="dropzone-canvas @dropClass"
+                    ondragover="event.preventDefault();"
+                    @ondrop="() => HandleDrop(0)"
+                    @ondragenter="HandleDragEnter"
+                    @ondragleave="HandleDragLeave">
+
+                    @if (Container.ProjectsPlaced != null && Container.ProjectsPlaced.Count() != 0)
+                    {
+                        @foreach (var project in Container.ProjectsPlaced.Where(_ => _.Col == 0))
+                        {
+                            <div id="@("Project" + project.Id)" class="project">
+                                <ProjectCanvas ProjectModel="project" />
+                            </div>
+                        }
+                    }
+                </ul>
+            </div>
+            <div class="col-3">
+                <ul class="dropzone-canvas @dropClass"
+                    ondragover="event.preventDefault();"
+                    @ondrop="() => HandleDrop(1)"
+                    @ondragenter="HandleDragEnter"
+                    @ondragleave="HandleDragLeave">
+
+                    @if (Container.ProjectsPlaced != null && Container.ProjectsPlaced.Count() != 0)
+                    {
+                        @foreach (var project in Container.ProjectsPlaced.Where(_ => _.Col == 1))
+                        {
+                            <div id="@("Project" + project.Id)" class="project">
+                                <ProjectCanvas ProjectModel="project" />
+                            </div>
+                        }
+                    }
+
+                </ul>
+            </div>
+            <div class="col-3">
+                <ul class="dropzone-canvas @dropClass"
+                    ondragover="event.preventDefault();"
+                    @ondrop="() => HandleDrop(2)"
+                    @ondragenter="HandleDragEnter"
+                    @ondragleave="HandleDragLeave">
+
+                    @if (Container.ProjectsPlaced != null && Container.ProjectsPlaced.Count() != 0)
+                    {
+                        @foreach (var project in Container.ProjectsPlaced.Where(_ => _.Col == 2))
+                        {
+                            <div id="@("Project" + project.Id)" class="project">
+                                <ProjectCanvas ProjectModel="project" />
+                            </div>
+                        }
+                    }
+
+                </ul>
+            </div>
+            <div class="col-3">
+                <ul class="dropzone-canvas @dropClass"
+                    ondragover="event.preventDefault();"
+                    @ondrop="() => HandleDrop(3)"
+                    @ondragenter="HandleDragEnter"
+                    @ondragleave="HandleDragLeave">
+
+                    @if (Container.ProjectsPlaced != null && Container.ProjectsPlaced.Count() != 0)
+                    {
+                        @foreach (var project in Container.ProjectsPlaced.Where(_ => _.Col == 3))
+                        {
+                            <div id="@("Project" + project.Id)" class="project">
+                                <ProjectCanvas ProjectModel="project" />
+                            </div>
+                        }
+                    }
+
+                </ul>
+            </div>
+            @if (GraphData != null && GraphData.Count != 0)
+            {
+
+                <ChartJsLineChart @ref="blazorLineChartJS" Width="600" Height="300" Config="@_config" />
+            }
+        </div>
+    </div>
+    <div class="row" style="margin-top:20px;">
+        <ul>
+            <p>Dependencies</p>
+            @foreach (var dep in Container.DependenciesPlaced)
+            {
+                <li>@(dep.DependencyModel.DependencyType.ToString() + ": " + dep.Source.Id + " to " + dep.Destination.Id + ". Weight: " + dep.DependencyModel.Weight)</li>
+            }
+
+            <p>Calculated values</p>
+            @foreach (var s in Output)
+            {
+                <li>@s</li>
+            }
+        </ul>
+    </div>
+</div>
+
+@code {
+
+    [CascadingParameter] ProjectsContainer Container { get; set; }
+
+    List<ProjectModel> Projects = new List<ProjectModel>();
+    string dropClass = "";
+
+    [Parameter]
+    public List<string> Output { get; set; }
+
+    [Parameter]
+    public List<SimModel> GraphData { get; set; }
+
+    LineConfig _config { get; set; }
+
+    public ChartJsLineChart blazorLineChartJS { get; set; } = new ChartJsLineChart();
+    ChartJsLineChart lineChartJs;
+
+    protected override void OnParametersSet()
+    {
+    }
+
+    private void HandleDragEnter()
+    {
+
+        dropClass = "can-drop";
+    }
+
+    private void HandleDragLeave()
+    {
+        dropClass = "";
+        Container.ProjectsPlaced.Remove(Container.Payload);
+    }
+
+    protected async override Task OnInitializedAsync()
+    {
+        Projects = Container.ProjectsPlaced;
+
+        LineDataset<ProjectModel> set = new LineDataset<ProjectModel>()
+        {
+
+        };
+        set.AddRange((IEnumerable<ProjectModel>)Projects);
+
+        _config = new LineConfig
+        {
+            Options = new LineOptions
+            {
+                Responsive = true,
+                Title = new OptionsTitle
+                {
+                    Display = true,
+                    Text = "Line Chart"
+                },
+                Legend = new Legend
+                {
+                    Position = Position.Right,
+                    Labels = new LegendLabelConfiguration
+                    {
+                        UsePointStyle = true
+                    }
+                },
+                Tooltips = new Tooltips
+                {
+                    Mode = InteractionMode.Nearest,
+                    Intersect = false
+                },
+                Scales = new Scales
+                {
+                    xAxes = new List<CartesianAxis>
+                {
+                            new LinearCartesianAxis
+                            {
+                                ScaleLabel = new ScaleLabel
+                                {
+                                    LabelString = "Years"
+                                },
+                                GridLines = new GridLines
+                                {
+                                    Display = false
+                                },
+                                Ticks = new LinearCartesianTicks
+                                {
+                                    SuggestedMin = 0
+                                }
+                            }
+                        },
+                    yAxes = new List<CartesianAxis>
+                {
+                            new LinearCartesianAxis
+                            {
+                                ScaleLabel = new ScaleLabel
+                                {
+                                    LabelString = "Revenue"
+                                }
+                            }
+                        }
+                },
+                Hover = new LineOptionsHover
+                {
+                    Intersect = true,
+                    Mode = InteractionMode.Y
+                }
+            }
+        };
+    }
+
+    private async Task HandleDrop(int col)
+    {
+        dropClass = "";
+
+        Container.ProjectsPlaced.Add(new ProjectModel
+        {
+            Id = Container.ProjectsPlaced.Any() ?
+                Container.ProjectsPlaced.OrderByDescending(_ => _.Id).First().Id + 1 :
+                1,
+            Description = Container.Payload.Description,
+            Cost = Container.Payload.Cost,
+            Reveneu = Container.Payload.Reveneu,
+            Col = col
+        });
+        Container.HasChanged();
+    }
+
+    public void UpdateGraph(List<SimModel> model)
+    {
+        Random random = new Random();
+        _config.Data.Datasets.Clear();
+
+        foreach (var set in model)
+        {
+            var Data = new LineDataset<Point>()
+            {
+                BackgroundColor = String.Format("#{0:X6}", random.Next(0x1000000)),
+                BorderColor = "#ff6384",
+                Label = "Project " + set.ProjectId,
+                Fill = false,
+                BorderWidth = 2,
+                PointRadius = 3,
+                PointBorderWidth = 1
+            };
+
+        Data.AddRange(set.Entries.Select(_ => new Point(_.Year, _.Result)));
+        _config.Data.Datasets.Add(Data);
+    }
+
+    Container.HasChanged();
+    }
+}

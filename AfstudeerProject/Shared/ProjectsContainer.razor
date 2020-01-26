@@ -1,0 +1,53 @@
+﻿<div class="jobs-container">
+
+    <CascadingValue Value="this">
+        @ChildContent
+    </CascadingValue>
+
+</div>
+
+@code {
+    [Parameter] public List<ProjectModel> Projects { get; set; }
+    [Parameter] public List<ProjectDependencyModel> ProjectDependency { get; set; }
+    [Parameter] public List<DependencyModel> Dependencies { get; set; }
+
+    [Parameter]
+    public List<ProjectModel> ProjectsPlaced { get; set; }
+    [Parameter]
+    public List<ProjectDependencyModel> DependenciesPlaced { get; set; }
+
+    [Parameter]
+    public EventCallback<List<ProjectModel>> ProjectsPlacedChanged { get; set; }
+    [Parameter]
+    public EventCallback<List<ProjectDependencyModel>> DependenciesPlacedChanged { get; set; }
+
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+    public EventCallback<ProjectModel> OnStatusUpdated { get; set; }
+
+    public ProjectModel Payload { get; set; }
+
+    public DependencyModel PayloadDep { get; set; }
+
+    public async Task UpdateJobAsync(/*JobStatuses newStatus*/)
+    {
+        var task = Projects.SingleOrDefault(x => x.Id == Payload.Id);
+
+        if (task != null)
+        {
+            await OnStatusUpdated.InvokeAsync(Payload);
+        }
+
+    }
+
+    protected override async Task OnInitializedAsync() {
+        ProjectsPlaced = new List<ProjectModel>();
+        DependenciesPlaced = new List<ProjectDependencyModel>();
+    }
+
+    public async void HasChanged() {
+        this.StateHasChanged();
+        await ProjectsPlacedChanged.InvokeAsync(ProjectsPlaced);
+        await DependenciesPlacedChanged.InvokeAsync(DependenciesPlaced);
+    }
+}

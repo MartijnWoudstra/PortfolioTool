@@ -1,0 +1,259 @@
+﻿@page "/"
+
+<ProjectsContainer @ref="container" Projects="Projects" ProjectDependency="ProjectDependency" Dependencies="Dependencies" @bind-ProjectsPlaced="ProjPlaced"
+                   @bind-DependenciesPlaced="depsPlaced">
+
+    <div class="col-2" name="div" id="div">
+
+        <div class="row">
+            <ProjectList />
+        </div>
+        <div class="row">
+
+            <button class="btn btn-primary btn-block" type="submit" @onclick="() => Calculate()">Calculate</button>
+        </div>
+    </div>
+    <div class="col-8">
+        <Canvas Output="Output" GraphData="GraphData" @ref="Canvas" />
+    </div>
+</ProjectsContainer>
+
+@code {
+    List<ProjectModel> Projects = new List<ProjectModel>();
+    List<DependencyModel> Dependencies = new List<DependencyModel>();
+    List<ProjectDependencyModel> ProjectDependency = new List<ProjectDependencyModel>();
+    ProjectsContainer container { get; set; }
+    public List<String> Output { get; set; }
+    public List<ProjectModel> ProjPlaced { get; set; }
+    public List<ProjectDependencyModel> depsPlaced { get; set; }
+    public List<SimModel> GraphData = new List<SimModel>();
+    public Canvas Canvas { get; set; }
+
+    protected override void OnInitialized()
+    {
+        ProjPlaced = new List<ProjectModel>();
+        depsPlaced = new List<ProjectDependencyModel>();
+        Output = new List<String>();
+        container = new ProjectsContainer();
+        Projects.Add(new ProjectModel()
+        {
+        });
+
+        Dependencies.Add(new DependencyModel()
+        {
+            DependencyType = DependencyType.Hard
+        });
+
+        Dependencies.Add(new DependencyModel()
+        {
+            DependencyType = DependencyType.SoftNeg
+        });
+
+        Dependencies.Add(new DependencyModel()
+        {
+            DependencyType = DependencyType.SoftPos
+        });
+    }
+
+    void Calculate()
+    {
+
+        Output = new List<String>();
+        foreach (var Project in ProjPlaced.Where(_ => _.Col == 0).ToList())
+        {
+            var ENPV = CalculateOVA(Project, 0);
+            Output.Add("Expected Net Profit value of project " + Project.Id + ": €" + ENPV);
+        }
+        Simulate();
+    }
+
+    double CalculateNPV(ProjectModel model)
+    {
+        return model.Reveneu - model.Cost;
+    }
+
+    double CalculateOVA(ProjectModel model, int depth)
+    {
+        depth++;
+        if (depth == 10)
+        {
+            throw new Exception();
+        }
+        double amount = CalculateNPV(model);
+        if (!depsPlaced.Any(_ => _.Source.Id == model.Id))
+        {
+            return amount;
+        }
+        else
+        {
+            foreach (var dep in depsPlaced.Where(_ => _.Source.Id == model.Id))
+            {
+                switch (dep.DependencyModel.DependencyType)
+                {
+                    case DependencyType.Hard:
+                        amount += CalculateOVA(dep.Destination, depth);
+                        break;
+                    case DependencyType.SoftPos:
+                        amount += Math.Max(CalculateOVA(dep.Destination, depth), 0) - Math.Max(dep.Destination.Reveneu * (1 - dep.DependencyModel.Weight) - dep.Destination.Cost, 0);
+                        break;
+                    case DependencyType.SoftNeg:
+                        amount -= Math.Max(CalculateOVA(dep.Destination, depth), 0) - Math.Max(dep.Destination.Reveneu * (1 - dep.DependencyModel.Weight) - dep.Destination.Cost, 0);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        return amount;
+    }
+
+    void Simulate()
+    {
+        var simObjects = new List<SimModel>();
+
+        //Initialize list
+        foreach (var Project in ProjPlaced.Where(_ => _.Col == 0).ToList())
+        {
+            simObjects.Add(new SimModel
+            {
+                ProjectId = Project.Id
+            });
+        };
+
+        //Run simulation
+        for (int i = 0; i < 20; i++)
+        {
+            foreach (var model in simObjects)
+            {
+                var res = CalcReveneu(ProjPlaced.Single(_ => _.Id == model.ProjectId), i);
+                var prevResult = 0d;
+                var prev = model.Entries.SingleOrDefault(_ => _.Year == i - 1);
+                if (prev != null)
+                {
+                    prevResult = prev.Result;
+                }
+                model.Entries.Add(new SimEntry { Year = i, Result = res + prevResult });
+            }
+        }
+        GraphData = simObjects;
+        StateHasChanged();
+        Canvas.UpdateGraph(GraphData);
+
+    }
+
+    double CalcReveneu(ProjectModel project, int i)
+    {
+
+        if (i < (project.Duration + FindStartYear(project)))
+        {
+            if (i < FindStartYear(project))
+            {
+                //var old = model.Entries.Where(_ => _.Year == i - 1).FirstOrDefault();
+                //var oldRev = 0d;
+                //if (old != null)
+                //{
+                //    oldRev = old.Result;
+                //}
+                //model.Entries.Add(new SimEntry
+                //{
+                //    Year = i,
+                //    Result = oldRev - project.Cost
+                //});
+                return 0;
+            }
+            else
+            {
+                var sum = -project.Cost;
+                foreach (var dep in FindForwardDependency(project))
+                {
+                    var depDec = depsPlaced.Where(_ => _.Source == project && _.Destination == dep).SingleOrDefault();
+                    if (depDec.DependencyModel.DependencyType == DependencyType.Hard)
+                    {
+                        //Do nothing,
+                    }
+                    else if (depDec.DependencyModel.DependencyType == DependencyType.SoftNeg)
+                    {
+                        sum += (CalcReveneu(dep, i));
+                    }
+                    else
+                    {
+                        sum += CalcReveneu(dep, i);
+                    }
+                }
+
+                return sum;
+            }
+
+        }
+        else
+        {
+            //model.Entries.Add(new SimEntry
+            //{
+            //    Year = i,
+            //    Result = model.Entries.Where(_ => _.Year == i - 1).First().Result + project.Reveneu
+            //});
+            double sum = 0;
+            foreach (var dep in FindForwardDependency(project))
+            {
+                var depDec = depsPlaced.Where(_ => _.Source == project && _.Destination == dep).SingleOrDefault();
+                if (depDec.DependencyModel.DependencyType == DependencyType.Hard) {
+
+                    sum += (CalcReveneu(dep, i));
+                }
+                else if (depDec.DependencyModel.DependencyType == DependencyType.SoftNeg)
+                {
+                    sum += (CalcReveneu(dep, i)) * (1 - depDec.DependencyModel.Weight);
+                } else
+                {
+                    var rev = CalcReveneu(dep, i);
+                    sum += (rev * (1 + depDec.DependencyModel.Weight));
+                }
+            }
+
+            return project.Reveneu + sum;
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+    List<ProjectModel> FindForwardDependency(ProjectModel p)
+    {
+        return depsPlaced.Where(_ => _.Source.Id == p.Id).Select(_ => _.Destination).ToList();
+    }
+
+
+    int FindStartYear(ProjectModel p)
+    {
+        if (p.Col == 0) {
+            return 0;
+        }
+        if (!depsPlaced.Any(_ => _.Destination.Id == p.Id) || p.Col == 0)
+        {
+            return 0;
+        }
+        else
+        {
+            Dictionary<Dictionary<int, int>, int> map = new Dictionary<Dictionary<int, int>, int>();
+            foreach (var m in depsPlaced.Where(_ => _.Destination.Id == p.Id && _.DependencyModel.DependencyType == DependencyType.Hard))
+            {
+                var a = new Dictionary<int, int>();
+                a.Add(p.Id, m.Id);
+                map.Add(a, m.Source.Duration + FindStartYear(m.Source));
+            }
+            if (map.Count == 0) {
+                return 0;
+            }
+            var result = map.Aggregate((l, r) => l.Value > r.Value ? l : r).Value;
+            Console.Write(p.Id + " start year " + result);
+            return map.Aggregate((l, r) => l.Value > r.Value ? l : r).Value;
+        }
+    }
+}
